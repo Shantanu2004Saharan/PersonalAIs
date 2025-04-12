@@ -1,0 +1,5 @@
+{
+    "python.defaultInterpreterPath": "c:\\Users\\hello\\music_recommender\\new_env\\Scripts\\python.exe",
+    "python.analysis.extraPaths": ["./"],
+    "python.analysis.indexing": true
+}

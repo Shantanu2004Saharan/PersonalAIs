@@ -1,0 +1,92 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f4f7fa;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 2.5rem;
+    border-radius: 1.2rem;
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 550px;
+}
+
+h1 {
+    text-align: center;
+    color: #2e2e2e;
+    margin-bottom: 1.5rem;
+}
+
+h1 i {
+    margin-right: 10px;
+    color: #9147ff;
+}
+
+label {
+    display: block;
+    margin-top: 1.2rem;
+    font-weight: 600;
+    color: #333;
+}
+
+input[type="text"],
+textarea {
+    width: 100%;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 0.5rem;
+    resize: none;
+    font-size: 1rem;
+}
+
+button {
+    width: 100%;
+    margin-top: 1.8rem;
+    padding: 0.75rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    font-weight: bold;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+.results {
+    margin-top: 2rem;
+}
+
+.results h2 {
+    font-size: 1.3rem;
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.song {
+    background-color: #f9f9f9;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 5px solid #007bff;
+    border-radius: 0.5rem;
+}
+
+.song strong {
+    color: #222;
+    font-size: 1.05rem;
+}
+
+.song em {
+    color: #555;
+}
