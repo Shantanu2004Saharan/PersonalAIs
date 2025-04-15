@@ -2,90 +2,138 @@ from sentence_transformers import SentenceTransformer
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import spacy
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Optional
 import logging
+from sklearn.metrics.pairwise import cosine_similarity
+from langdetect import detect
 
-# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
-    sentence_model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
+    # Load models with smaller footprint
+    sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
     sentiment_analyzer = SentimentIntensityAnalyzer()
     nlp = spacy.load("en_core_web_sm")
 except Exception as e:
     logger.error(f"Model loading failed: {e}")
-    
     raise
 
-class MoodVector:
+class TextAnalyzer:
     def __init__(self):
-        self.semantic_embed = None
-        self.audio_profile = {
-            'valence': 0.5,
+        self.activity_keywords = {
+            'working': ['work', 'study', 'code', 'write', 'read'],
+            'exercising': ['run', 'workout', 'exercise', 'gym', 'jog'],
+            'relaxing': ['relax', 'chill', 'unwind', 'rest', 'sleep'],
+            'driving': ['drive', 'commute', 'road trip', 'travel'],
+            'partying': ['party', 'celebrate', 'dance', 'club'],
+            'hindi': ['hindi', 'bollywood', 'indian'],
+            'punjabi': ['punjabi', 'bhangra'],
+            'tamil': ['tamil', 'kollywood'],
+            'telugu': ['telugu', 'tollywood']
+        }
+        
+        self.genre_keywords = {
+            'pop': ['pop', 'top 40'],
+            'rock': ['rock', 'alternative', 'indie'],
+            'jazz': ['jazz', 'blues'],
+            'electronic': ['electronic', 'edm', 'techno', 'house'],
+            'hiphop': ['hip hop', 'rap', 'r&b'],
+            'hindi': ['hindi', 'bollywood', 'indian'],
+            'punjabi': ['punjabi', 'bhangra'],
+            'tamil': ['tamil', 'kollywood'],
+            'telugu': ['telugu', 'tollywood']
+        }
+
+    async def analyze_text(self, text: str) -> Dict:
+        """Comprehensive text analysis for music recommendation"""
+
+        try:
+            language = detect(text)
+            if language == 'hi':
+        # Adjust weights for Hindi content
+                self.genre_keywords['hindi'].extend(['गाना', 'संगीत'])
+        except:
+            pass
+
+        doc = nlp(text.lower())
+        
+        # Semantic embedding
+        embedding = sentence_model.encode(text)
+        
+        # Sentiment analysis
+        sentiment = sentiment_analyzer.polarity_scores(text)
+        
+        # Extract features
+        activities = self._detect_activities(doc)
+        genres = self._detect_genres(doc)
+        temporal_context = self._detect_temporal_context(doc)
+        metaphors = self._detect_metaphors(doc)
+        key_phrases = self._extract_key_phrases(doc)
+        
+        return {
+            "embedding": embedding.tolist(),
+            "sentiment": sentiment,
+            "activities": activities,
+            "genres": genres,
+            "temporal_context": temporal_context,
+            "metaphors": metaphors,
+            "key_phrases": key_phrases,
+            "audio_features": self._predict_audio_features(text, sentiment, activities)
+        }
+    
+    def _detect_activities(self, doc) -> List[str]:
+        """Detect activities from text"""
+        return [
+            activity for activity, keywords in self.activity_keywords.items()
+            if any(token.text in keywords for token in doc)
+        ]
+    
+    def _detect_genres(self, doc) -> List[str]:
+        """Detect music genres from text"""
+        return [
+            genre for genre, keywords in self.genre_keywords.items()
+            if any(token.text in keywords for token in doc)
+        ]
+    
+    def _detect_temporal_context(self, doc) -> Optional[str]:
+        """Detect time references in text"""
+        time_phrases = ['morning', 'afternoon', 'evening', 'night', 'dawn']
+        for token in doc:
+            if token.text in time_phrases:
+                return token.text
+        return None
+    
+    def _detect_metaphors(self, doc) -> List[str]:
+        """Detect metaphorical language"""
+        return [
+            chunk.text for chunk in doc.noun_chunks 
+            if any(tok.text in ['like', 'as'] for tok in chunk)
+        ]
+    
+    def _extract_key_phrases(self, doc) -> List[str]:
+        """Extract important phrases from text"""
+        return [chunk.text for chunk in doc.noun_chunks if len(chunk.text.split()) > 1]
+    
+    def _predict_audio_features(self, text: str, sentiment: Dict, activities: List[str]) -> Dict:
+        """Predict ideal audio features based on text analysis"""
+        features = {
+            'valence': max(0, min(1, 0.5 + sentiment['compound'] * 0.5)),
             'energy': 0.5,
             'danceability': 0.5,
-            'tempo': 120,
+            'tempo': 100,
             'acousticness': 0.5
         }
-        self.activities = []
-        self.metaphors = []
-        self.temporal_context = None
-
-async def analyze_full_conversation(messages: List[str]) -> Dict:
-    """Analyze full conversation history (last few messages)"""
-    try:
-        full_text = " ".join(messages)
-        doc = nlp(full_text)
-        mv = MoodVector()
-
-        # Semantic embedding based on last message
-        mv.semantic_embed = sentence_model.encode(full_text)
-
-        # Sentiment (based on full conversation tone)
-        sentiment = sentiment_analyzer.polarity_scores(full_text)
-        mv.audio_profile['valence'] = normalize(sentiment['compound'], -1, 1, 0, 1)
-
-        # Activity and metaphor analysis
-        mv.activities = detect_activities(doc)
-        mv.metaphors = detect_metaphors(doc)
-        mv.temporal_context = detect_temporal_context(doc)
-
-        # Additional audio prediction
-        mv.audio_profile.update(predict_audio_features(full_text))
-
-        return mv.__dict__
-    except Exception as e:
-        logger.error(f"Conversation analysis failed: {e}")
-        raise
-
-def normalize(value, old_min, old_max, new_min, new_max):
-    return ((value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min
-
-def detect_activities(doc) -> List[str]:
-    verbs = {"study", "work", "relax", "exercise", "dance", "run", "walk", "drive", "party"}
-    return list({token.lemma_ for token in doc if token.pos_ == "VERB" and token.lemma_ in verbs})
-
-def detect_metaphors(doc) -> List[str]:
-    return [sent.text.strip() for sent in doc.sents if "like" in sent.text or "as" in sent.text]
-
-def detect_temporal_context(doc) -> str:
-    for token in doc:
-        if token.lower_ in {"morning", "evening", "night", "afternoon", "midnight"}:
-            return token.lower_
-    return "unspecified"
-
-def predict_audio_features(text: str) -> Dict[str, float]:
-    lowered = text.lower()
-    if any(w in lowered for w in ["chill", "relax", "calm", "slow"]):
-        return {"energy": 0.2, "danceability": 0.3, "tempo": 80, "acousticness": 0.8}
-    if any(w in lowered for w in ["party", "dance", "club", "excited", "hype"]):
-        return {"energy": 0.9, "danceability": 0.95, "tempo": 130, "acousticness": 0.1}
-    if any(w in lowered for w in ["drive", "focus", "work", "productive"]):
-        return {"energy": 0.6, "danceability": 0.5, "tempo": 110, "acousticness": 0.3}
-    if any(w in lowered for w in ["angry", "rage", "fired up"]):
-        return {"energy": 0.95, "danceability": 0.7, "tempo": 140, "acousticness": 0.2}
-    return {}
+        
+        # Adjust based on activities
+        if 'exercising' in activities:
+            features.update({'energy': 0.9, 'tempo': 130, 'danceability': 0.8})
+        elif 'relaxing' in activities:
+            features.update({'energy': 0.3, 'tempo': 80, 'acousticness': 0.8})
+        elif 'partying' in activities:
+            features.update({'energy': 0.95, 'danceability': 0.95, 'tempo': 125})
+        
+        return features
 
 
 

@@ -1,0 +1,41 @@
+[
+  {
+    "id": "1",
+    "name": "Relaxing Piano",
+    "artists": [
+      "Calm Artist"
+    ],
+    "preview_url": null,
+    "external_url": "https://open.spotify.com/track/1",
+    "features": {
+      "energy": 0.2,
+      "valence": 0.4
+    }
+  },
+  {
+    "id": "2",
+    "name": "Energetic EDM",
+    "artists": [
+      "DJ Hype"
+    ],
+    "preview_url": null,
+    "external_url": "https://open.spotify.com/track/2",
+    "features": {
+      "energy": 0.9,
+      "valence": 0.8
+    }
+  },
+  {
+    "id": "3",
+    "name": "Melancholic Guitar",
+    "artists": [
+      "Sad Strings"
+    ],
+    "preview_url": null,
+    "external_url": "https://open.spotify.com/track/3",
+    "features": {
+      "energy": 0.3,
+      "valence": 0.2
+    }
+  }
+]
