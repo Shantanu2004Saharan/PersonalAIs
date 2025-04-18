@@ -1,0 +1,3 @@
+new_env/
+new_env/Lib/site-packages/torch/lib/torch_cpu.dll
+new_env/Lib/site-packages/torch/lib/dnnl.lib

@@ -18,9 +18,9 @@ from sentence_transformers import SentenceTransformer, util
 
 # Load vector data and metadata
 
-VECTOR_PATH = "data/track_embeddings.npy"
-INDEX_PATH = "data/faiss_index.bin"
-METADATA_PATH = "data/track_metadata.json"
+VECTOR_PATH = r"C:\Users\hello\music_recommender\backend\data\track_embeddings.npy"
+INDEX_PATH = r"C:\Users\hello\music_recommender\backend\data\faiss_index.bin"
+METADATA_PATH = r"C:\Users\hello\music_recommender\backend\data\track_metadata.json"
 
 def load_track_embeddings():
     # Load precomputed numpy embeddings
@@ -62,6 +62,26 @@ async def generate_dynamic_recommendations(user_message: str) -> Tuple[str, List
     mood = "chill" if "relax" in user_message.lower() else "energetic"
 
     return mood, matched_tracks # adjust this if your TrackRecommendation class is elsewhere
+
+def get_recommendations_with_filters(
+    spotify: SpotifyClient, 
+    tracks: List[dict], 
+    mood_filters: dict
+) -> List[dict]:
+    """
+    Filter a list of tracks based on mood filters like valence, energy, etc.
+    """
+    def matches(track, filters):
+        for key, value in filters.items():
+            if key not in track['features']:
+                return False
+            # Allowing a small margin of ±0.1
+            if abs(track['features'][key] - value) > 0.1:
+                return False
+        return True
+
+    return [track for track in tracks if matches(track, mood_filters)]
+
 
 SPOTIFY_CLIENT_ID = "5b42d00bcf0a42de83f9bd8855c5d629"
 SPOTIFY_CLIENT_SECRET = "246b8f0425dc464ba1758a1e2ab4fa72"
@@ -288,3 +308,4 @@ class MusicRecommender:
 class RecommendationError(Exception):
     """Custom exception for recommendation failures"""
     pass
+

@@ -1,28 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Music Recommender</title>
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta charset="UTF-8">
+    <title>Music Mood Recommender</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div class="container">
-    <h1><i class="fas fa-music"></i> Music Recommender</h1>
-    
-    <form id="recommendationForm">
-    <label>User ID:</label>
-    <input type="text" id="userId" placeholder="Enter user ID" required>
-
-    <label>Description:</label>
-    <textarea id="description" rows="4" placeholder="How are you feeling or what are you doing?" required></textarea>
-
-    <button type="submit">Get Recommendations</button>
-    </form>
-
-    <div id="results"></div>
-</div>
-
-<script src="script.js"></script>
+    <h1>Music Mood Recommender 🎵</h1>
+    <div id="chat-container"></div>
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="How are you feeling today?">
+        <button id="send-button">Send</button>
+    </div>
+    <div id="recommendations"></div>
+    <script src="/static/script.js"></script>
 </body>
 </html>

@@ -1,0 +1,6 @@
+# Ignore the new_env directory (including all files in it)
+new_env/
+
+# Ignore specific large files that were problematic
+new_env/Lib/site-packages/torch/lib/torch_cpu.dll
+new_env/Lib/site-packages/torch/lib/dnnl.lib

@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from typing import AsyncGenerator, Optional, List, Dict, Any
 import logging
@@ -8,11 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import uvicorn
 from datetime import datetime
 import logging.config
-
-# Import from internal modules
+from fastapi.staticfiles import StaticFiles
 from database import AsyncSessionLocal
 from recommendation import generate_dynamic_recommendations
 from feedback_learner import FeedbackLearner, save_feedback
+from pathlib import Path
+from fastapi import Request
+from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse
 
 # ------------------ Logger Setup ------------------
 logger: logging.Logger = logging.getLogger(__name__)
@@ -21,13 +24,9 @@ logger.setLevel(logging.INFO)
 # ------------------ FastAPI App Setup ------------------
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5500"],  # For development only; restrict in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Serve static files (frontend)
+frontend_path = Path(__file__).parent/ "frontend"
+app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
 # ------------------ Database Dependency ------------------
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -65,17 +64,26 @@ class ChatResponse(BaseModel):
     recommendations: List[TrackRecommendation]
     analysis: Dict[str, Any]
 
-# ------------------ Endpoints ------------------
-@app.post("/test")
-async def test_endpoint():
-    return {"message": "POST works!"}
+# ------------------ Frontend Serving ------------------
+'''@app.get("/")
+async def serve_frontend(request: Request):
+    # Don't interfere with FastAPI docs or OpenAPI routes
+    if request.url.path in ["/docs", "/redoc", "/openapi.json"]:
+        return RedirectResponse(url=request.url.path)
+    
+    return FileResponse(frontend_path / "index.html")
 
-@app.get("/health")
-async def health_check() -> Dict[str, str]:
-    """Health check endpoint"""
-    return {"status": "healthy"}
+'''
+@app.get("/", response_class=HTMLResponse)
+async def serve_frontend():
+    return FileResponse(frontend_path / "index.html")
 
-@app.post("/chat", response_model=ChatResponse)
+@app.get("/api")
+async def api_root():
+    return {"message": "Welcome to the Music Recommender API"}
+
+# ------------------ API Endpoints ------------------
+@app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db)
@@ -88,7 +96,7 @@ async def chat_endpoint(
 
         return JSONResponse(content={
             "text": f"I detected a {mood} mood. Here are some music recommendations:",
-            "recommendations": recommendations[:12],  # Trim if more
+            "recommendations": recommendations[:12],
             "analysis": {
                 "detected_mood": mood,
                 "confidence": 0.9,
@@ -103,20 +111,18 @@ async def chat_endpoint(
             detail=f"Chat processing failed: {str(e)}"
         )
 
-@app.post("/feedback")
+@app.post("/api/feedback")
 async def handle_feedback(
     feedback: FeedbackRequest,
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        # Save feedback to database or file
         await save_feedback(
             user_id=feedback.user_id,
             track_id=feedback.track_id,
             liked=feedback.liked
         )
 
-        # Learn from feedback
         feedback_learner = FeedbackLearner(db)
         await feedback_learner.process_feedback(
             feedback.user_id,
@@ -128,27 +134,6 @@ async def handle_feedback(
     except Exception as e:
         logger.error(f"Feedback error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-    
-LOGGING_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "default": {
-            "format": "[%(asctime)s] %(levelname)s - %(name)s - %(message)s",
-        },
-    },
-    "handlers": {
-        "default": {
-            "level": "INFO",
-            "formatter": "default",
-            "class": "logging.StreamHandler",
-        },
-    },
-    "root": {
-        "level": "INFO",
-        "handlers": ["default"]
-    },
-}
 
 # ------------------ Run App ------------------
 if __name__ == "__main__":
@@ -157,5 +142,24 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        log_config=LOGGING_CONFIG
+        log_config={
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "default": {
+                    "format": "[%(asctime)s] %(levelname)s - %(name)s - %(message)s",
+                },
+            },
+            "handlers": {
+                "default": {
+                    "level": "INFO",
+                    "formatter": "default",
+                    "class": "logging.StreamHandler",
+                },
+            },
+            "root": {
+                "level": "INFO",
+                "handlers": ["default"]
+            },
+        }
     )
