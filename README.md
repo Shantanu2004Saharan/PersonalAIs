@@ -154,4 +154,4 @@ https://drive.google.com/drive/u/4/folders/1zikkLDk_dbxz8yucueCXbxWCBKTQcI3d
 # Thank You for Using PersonalAIs
 > *"Music is the shorthand of emotion." – Leo Tolstoy*
 >
-> ![Screenshot of PersonalAIs Interface](alembic/personalAIs.png)
+> ![Screenshot of PersonalAIs Interface](alembic/Interface.png)
