@@ -4,17 +4,16 @@ from sklearn.metrics.pairwise import cosine_similarity
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_user_conversation_history, update_user_preferences
-from nlp_module import TextAnalyzer
-from spotify import SpotifyClient
+from model_matcher_nlp import TextAnalyzer
+from spotify_client import SpotifyClient
 from datetime import datetime
 import os
 from sentence_transformers import SentenceTransformer, util
 import faiss
 import json
+from model_matcher_nlp import TrackRecommendation 
+from spotify_client import SpotifyClient, generate_dynamic_recommendations
 
-from models import TrackRecommendation 
-
-from sentence_transformers import SentenceTransformer, util
 
 # Load vector data and metadata
 
@@ -46,22 +45,44 @@ async def generate_dynamic_recommendations(user_message: str) -> Tuple[str, List
 
     D, I = index.search(query_embedding, k=12)  # Top 12 matches
 
+    seen = set()
     matched_tracks = []
+
     for idx in I[0]:
         track = metadata[idx]
-        matched_tracks.append(TrackRecommendation(
+        if track["id"] not in seen:
+            seen.add(track["id"])
+            matched_tracks.append(track)
+
+    spotify = SpotifyClient()
+    track_ids = [track["id"] for track in matched_tracks]
+
+    # 🆕 Improved fetching: batch call
+    audio_features_list = spotify.get_audio_features_batch(track_ids) or []
+
+    features_map = {}
+    if audio_features_list:
+        for track_id, features in zip(track_ids, audio_features_list):
+            if features:
+                features_map[track_id] = features
+
+    final_tracks = []
+    for track in matched_tracks:
+        features = features_map.get(track["id"], {})
+        final_tracks.append(TrackRecommendation(
             id=track["id"],
             name=track["name"],
             artists=track["artists"],
-            preview_url=track.get("preview_url"),
-            external_url=track["external_url"],
-            features=track["features"]
-        ))
+            preview_url=track.get("preview_url") or f"https://p.scdn.co/mp3-preview/{track['id']}",
+            external_url=track.get("external_url") or track.get("external_urls", {}).get("spotify") or f"https://open.spotify.com/track/{track['id']}",
+            features=features
+            ))
 
-    # Naive mood detection (can improve later)
+
     mood = "chill" if "relax" in user_message.lower() else "energetic"
 
-    return mood, matched_tracks # adjust this if your TrackRecommendation class is elsewhere
+    return mood, final_tracks
+
 
 def get_recommendations_with_filters(
     spotify: SpotifyClient, 
@@ -95,64 +116,72 @@ class MusicRecommender:
         self.text_analyzer = TextAnalyzer()
         self.spotify = SpotifyClient()
         self.conversation_memory = {}
-    
+
     async def recommend_songs(
         self, 
         db: AsyncSession,
         user_id: str, 
         user_input: str
     ) -> Dict[str, Any]:
-        """
-        Generate personalized song recommendations with context
-        
-        Args:
-            db: Async database session
-            user_id: Unique user identifier
-            user_input: Current user message/input
-            
-        Returns:
-            Dictionary containing:
-            - analysis: Mood/activity/genre analysis
-            - recommendations: Sorted list of tracks
-            - explanation: Human-readable justification
-        """
         try:
-            # Get conversation history for context
             history = await get_user_conversation_history(db, user_id)
-            context = " ".join([msg.message for msg in history[-5:]])  # Last 5 messages
-            
-            # Analyze text with NLP
+            context = " ".join([msg.message for msg in history[-5:]])
             full_text = f"{context} {user_input}".strip()
+
             analysis = await self.text_analyzer.analyze_text(full_text)
             logger.info(f"Analysis completed for user {user_id}: {analysis}")
-            
-            # Prepare dynamic audio features for filtering
-            audio_features = {
-                f"target_{k}": v for k, v in analysis['audio_features'].items() if v is not None
-            }
 
-            spotify_query = {
-                'seed_genres': analysis['genres'][:2],
-                'limit': 100,
-                **audio_features
-            }
-
-            # Get recommendations from Spotify
-            recommendations = await self.spotify.get_recommendations(spotify_query)
-            
+            spotify_query = user_input
+            recommendations = self.spotify.search_tracks(spotify_query, limit=30)
             if not recommendations:
                 raise ValueError("No recommendations found from Spotify API")
-            
-            # Score, filter and sort recommendations
-            scored_recommendations = self._score_recommendations(
-                recommendations, 
-                analysis
-            )
-            top_recommendations = scored_recommendations[:10]  # Return top 10
-            
-            # Update user preferences
+
+            track_ids = [track['id'] for track in recommendations if 'id' in track]
+
+            try:
+                audio_features_list = self.spotify.get_audio_features_batch(track_ids)
+                if not audio_features_list:
+                    logger.warning("No audio features returned. Using default backup tracks.")
+                    audio_features_list = [{} for _ in track_ids]
+            except Exception as e:
+                logger.error(f"Spotify audio feature fetch failed: {e}")
+                audio_features_list = [{} for _ in track_ids]
+
+            features_map = {
+                track_id: af for track_id, af in zip(track_ids, audio_features_list) if af
+            }
+
+            for track in recommendations:
+                track_id = track.get('id')
+                track['features'] = features_map.get(track_id, {})
+
+            scored_recommendations = self._score_recommendations(recommendations, analysis)
+            top_recommendations = scored_recommendations[:10]
+
+            MIN_RECOMMENDATIONS = 10
+            if len(top_recommendations) < MIN_RECOMMENDATIONS:
+                logger.warning(f"Only {len(top_recommendations)} songs found. Adding fallback songs...")
+
+                existing_ids = {t["id"] for t in top_recommendations}
+                extra_needed = MIN_RECOMMENDATIONS - len(top_recommendations)
+
+                for track in scored_recommendations[len(top_recommendations):]:
+                    if track["id"] not in existing_ids:
+                        top_recommendations.append(track)
+                        existing_ids.add(track["id"])
+                    if len(top_recommendations) >= MIN_RECOMMENDATIONS:
+                        break
+
+                if not top_recommendations:
+                    logger.warning("All scoring failed. Returning raw Spotify search results.")
+                    for track in recommendations[:MIN_RECOMMENDATIONS]:
+                        track.setdefault("features", {})
+                        track["match_score"] = 0.0
+                        track["feature_breakdown"] = {}
+                        top_recommendations.append(track)
+
             await self._update_user_profile(db, user_id, analysis)
-            
+
             return {
                 "analysis": {
                     "mood": self._describe_mood(analysis['sentiment']),
@@ -161,30 +190,36 @@ class MusicRecommender:
                     "key_phrases": analysis.get('key_phrases', [])
                 },
                 "recommendations": top_recommendations,
-                "explanation": self._generate_explanation(analysis, top_recommendations[0])
+                "explanation": self._generate_explanation(analysis, top_recommendations[0]) if top_recommendations else "No recommendations found."
             }
-            
+
         except Exception as e:
             logger.error(f"Recommendation failed for user {user_id}: {str(e)}", exc_info=True)
             raise RecommendationError(f"Recommendation failed: {str(e)}") from e
+
+    async def _update_user_profile(self, db, user_id, analysis):
+        logger.info(f"Updating user profile for user {user_id}... [SKIPPED]")
+
+    def _describe_mood(self, sentiment: dict) -> str:
+        compound = sentiment.get("compound", 0)
+        if compound >= 0.5:
+            return "upbeat and energetic"
+        elif compound >= 0:
+            return "positive and cheerful"
+        else:
+            return "calm or reflective"
+
+    def _generate_explanation(self, analysis: dict, top_track: dict) -> str:
+        return f"Because you mentioned activities like {', '.join(analysis.get('activities', []))}, this song matches your energy and vibe!"
 
     def _score_recommendations(
         self, 
         recommendations: List[Dict], 
         analysis: Dict
     ) -> List[Dict]:
-        """
-        Score recommendations based on multiple factors:
-        - Audio feature matching (50%)
-        - Genre relevance (30%) 
-        - Activity matching (20%)
-        """
         scored = []
-
         for track in recommendations:
-            # Dynamic feature similarity
-            feature_keys = ['valence', 'energy', 'danceability']  # Extend as needed
-
+            feature_keys = ['valence', 'energy', 'danceability']
             track_vec = []
             target_vec = []
 
@@ -195,19 +230,16 @@ class MusicRecommender:
                     track_vec.append(track_val)
                     target_vec.append(target_val)
 
+            feature_score = 0.0
             if track_vec and target_vec:
                 track_features = np.array(track_vec).reshape(1, -1)
                 target_features = np.array(target_vec).reshape(1, -1)
                 feature_score = 0.5 * cosine_similarity(target_features, track_features)[0][0]
-            else:
-                feature_score = 0
 
-            # Genre matching (Jaccard similarity)
             track_genres = set(track.get('genres', []))
             target_genres = set(analysis['genres'])
             genre_score = 0.3 * len(track_genres & target_genres) / len(track_genres | target_genres) if track_genres else 0
 
-            # Activity matching
             activity_score = 0.2 if any(
                 activity.lower() in [a.lower() for a in track.get('activity_tags', [])]
                 for activity in analysis['activities']
@@ -225,85 +257,11 @@ class MusicRecommender:
                 }
             })
 
-        # Sort by score and remove very low matches
         return sorted(
-            [t for t in scored if t['match_score'] > 0.2],  # Lower threshold
+            [t for t in scored if t['match_score'] > 0.2],
             key=lambda x: x['match_score'],
             reverse=True
         )[:12]
-
-    async def _update_user_profile(
-        self,
-        db: AsyncSession,
-        user_id: str,
-        analysis: Dict
-    ) -> None:
-        """Update user preferences in database based on current interaction"""
-        try:
-            preferences = {
-                'last_updated': datetime.now().isoformat(),
-                'genres': analysis['genres'],
-                'activities': analysis['activities'],
-                'mood_profile': {
-                    'valence': analysis['audio_features']['valence'],
-                    'energy': analysis['audio_features']['energy'],
-                    'sentiment': analysis['sentiment']
-                },
-                'recent_keywords': analysis.get('key_phrases', [])
-            }
-            
-            await update_user_preferences(db, user_id, preferences)
-            logger.info(f"Updated preferences for user {user_id}")
-            
-        except Exception as e:
-            logger.error(f"Failed to update preferences for user {user_id}: {str(e)}")
-            raise
-
-    def _describe_mood(self, sentiment: Dict) -> str:
-        """Convert sentiment analysis to descriptive mood"""
-        compound = sentiment['compound']
-        if compound > 0.6:
-            return "upbeat and positive"
-        elif compound > 0.2:
-            return "positive"
-        elif compound > -0.2:
-            return "neutral"
-        elif compound > -0.6:
-            return "somber"
-        else:
-            return "melancholic"
-
-    def _generate_explanation(
-        self, 
-        analysis: Dict, 
-        top_track: Dict
-    ) -> str:
-        """Generate natural language explanation for recommendations"""
-        explanations = []
-
-        # Mood context
-        mood = self._describe_mood(analysis['sentiment'])
-        explanations.append(f"Based on your {mood} mood,")
-
-        # Activity context
-        if analysis['activities']:
-            activities = ", ".join(analysis['activities'][:2])
-            explanations.append(f"perfect for {activities},")
-
-        # Track justification
-        explanations.append(
-            f"we recommend '{top_track['name']}' by {', '.join(top_track['artists'])} "
-            f"with a {top_track['match_score']*100:.0f}% match "
-            f"(similar mood and {top_track['features']['energy']*100:.0f}% energy)."
-        )
-
-        # Genre context
-        if analysis['genres']:
-            genres = ", ".join(analysis['genres'][:2])
-            explanations.append(f"Enjoy these {genres} vibes!")
-
-        return " ".join(explanations)
-
 
 class RecommendationError(Exception):
     """Custom exception for recommendation failures"""

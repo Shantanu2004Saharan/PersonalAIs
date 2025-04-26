@@ -2,18 +2,395 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Music Mood Recommender</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/static/style.css">
+    <title>🎵 PersonalAIs</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0e0e0e;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: #4285F4; /* Changed to blue */
+            margin: 0;
+        }
+
+        .spotify-btn {
+            background: #4285F4; /* Changed to blue */
+            color: #fff;
+            border: none;
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .spotify-btn:hover {
+            background: #3367D6; /* Darker blue for hover */
+        }
+
+        /* Combined chat area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #333;
+            color: #ffcc00;
+            align-self: flex-end;
+            text-align: right;
+        }
+
+        .bot-message {
+            background-color: #4285F4; /* Changed to blue */
+            color: #000;
+            align-self: flex-start;
+            text-align: left;
+        }
+
+        .input-area {
+            display: flex;
+            padding: 1rem;
+            background-color: #222;
+            border-top: 1px solid #333;
+        }
+
+        .input-area textarea {
+            flex: 1;
+            background: #2a2a2a;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            padding: 0.75rem;
+            font-size: 1rem;
+            resize: none;
+            min-height: 60px;
+        }
+
+        .send-btn {
+            background-color: #4285F4; /* Changed to blue */
+            border: none;
+            border-radius: 8px;
+            padding: 0 1.5rem;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 1rem;
+            transition: background 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #3367D6; /* Darker blue for hover */
+        }
+
+        .recommendations {
+            margin-top: 1rem;
+        }
+
+        .track {
+            display: flex;
+            align-items: center;
+            background-color: #1f1f1f;
+            border-radius: 8px;
+            margin: 0.5rem 0;
+            padding: 0.75rem;
+            gap: 1rem;
+        }
+
+        .track img {
+            width: 64px;
+            height: 64px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        .track-info {
+            flex-grow: 1;
+        }
+
+        .track-info strong {
+            font-size: 1rem;
+            display: block;
+        }
+
+        .track-info span {
+            font-size: 0.875rem;
+            color: #aaa;
+        }
+
+        .track-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .arrow-link {
+            color: #4285F4; /* Changed to blue */
+            font-size: 1.5rem;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .arrow-link:hover {
+            color: #3367D6; /* Darker blue for hover */
+        }
+
+        .playlist {
+            margin-top: 1.5rem;
+            background-color: #1a1a1a;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .playlist label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .playlist input {
+            width: 100%;
+            background: #2a2a2a;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem;
+            color: white;
+        }
+
+        .playlist button {
+            margin-top: 1rem;
+            width: 100%;
+            padding: 0.5rem; /* Increased padding */
+            font-size: 1rem; /* Increased font size */
+        }
+
+        .audio-preview audio {
+            width: 160px;
+            height: 32px;
+            border-radius: 8px;
+            background-color: #333;
+            outline: none;
+        }
+
+        #playlistResult {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Music Mood Recommender 🎵</h1>
-    <div id="chat-container"></div>
-    <div id="input-area">
-        <input type="text" id="user-input" placeholder="How are you feeling today?">
-        <button id="send-button">Send</button>
+    <div class="container">
+        <header>
+            <h1>🎵 PersonalAIs</h1>
+            <button class="spotify-btn" onclick="loginSpotify()">🔐 Login with Spotify</button>
+        </header>
+
+        <div class="chat-area">
+            <div class="chat-messages" id="chatBox"></div>
+            <div class="input-area">
+                <textarea id="message" placeholder="Tell me your vibe or mood..."></textarea>
+                <button class="send-btn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+
+        <div class="recommendations" id="recommendations"></div>
+
+        <div class="playlist">
+            <label for="playlistName">Playlist Name</label>
+            <input type="text" id="playlistName" value="My Mood Vibes" />
+            <button class="send-btn" onclick="createPlaylist()" style="padding: 1rem; font-size: 1.1rem;">➕ Create Playlist</button>
+            <div id="playlistResult"></div>
+        </div>
     </div>
-    <div id="recommendations"></div>
-    <script src="/static/script.js"></script>
+
+    <script>
+        const apiBase = 'http://127.0.0.1:8000/api';
+        const chatBox = document.getElementById('chatBox');
+        let currentRecs = [];
+
+        function loginSpotify() {
+            window.open("http://127.0.0.1:8000/login", "SpotifyLogin", "width=500,height=600");
+        }
+
+        function appendChat(role, text) {
+            const div = document.createElement('div');
+            div.className = `message ${role}-message`;
+            div.innerText = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = document.getElementById('message').value.trim();
+            if (!message) return;
+
+            appendChat('user', message);
+            appendChat('bot', `✨ Let me find the perfect tracks for: "${message}"`);
+            document.getElementById('message').value = '';
+
+            try {
+                const res = await fetch(`${apiBase}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: 'default_user', message })
+                });
+
+                const data = await res.json();
+                appendChat('bot', data.text);
+                showRecommendations(data.recommendations);
+                currentRecs = data.recommendations;
+            } catch (error) {
+                appendChat('bot', '⚠️ Oops! Something went wrong while fetching your recommendations.');
+                console.error("Error:", error);
+            }
+        }
+
+        function showRecommendations(tracks) {
+            const recDiv = document.getElementById('recommendations');
+            recDiv.innerHTML = '';
+            
+            if (!tracks || tracks.length === 0) {
+                recDiv.innerHTML = '<p>No recommendations found</p>';
+                return;
+            }
+
+            tracks.forEach(track => {
+                const previewUrl = track.preview_url || '';
+                const spotifyUrl = track.external_url || `https://open.spotify.com/track/${track.id}`;
+                const coverImage = track.album?.images?.[0]?.url || 'https://via.placeholder.com/64';
+
+                const div = document.createElement('div');
+                div.className = 'track';
+                div.innerHTML = `
+                    <img src="${coverImage}" alt="Album cover">
+                    <div class="track-info">
+                        <strong>${track.name}</strong>
+                        <span>${track.artists.join(', ')}</span>
+                        <div class="audio-preview">
+                            ${previewUrl ? `<audio controls src="${previewUrl}"></audio>` : '<small>No preview available</small>'}
+                        </div>
+                    </div>
+                    <div class="track-actions">
+                        <a class="arrow-link" href="${spotifyUrl}" target="_blank">➤</a>
+                    </div>
+                `;
+                recDiv.appendChild(div);
+            });
+        }
+
+        async function createPlaylist() {
+            const name = document.getElementById('playlistName').value;
+            const resultDiv = document.getElementById('playlistResult');
+            resultDiv.innerHTML = 'Creating playlist...';
+
+            try {
+                const tracks = currentRecs.map(t => ({ id: t.id }));
+                const res = await fetch(`${apiBase}/create_playlist`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        user_id: 'default_user', 
+                        playlist_name: name, 
+                        tracks 
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.playlist_url) {
+                    resultDiv.innerHTML = `
+                        <p>✅ Playlist created: 
+                            <a class="arrow-link" href="${data.playlist_url}" target="_blank">
+                                Open on Spotify
+                            </a>
+                        </p>`;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p style="color:red;">
+                            ❌ Failed: ${data.detail || 'Unknown error'}
+                        </p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p style="color:red;">
+                        ❌ Error: ${error.message}
+                    </p>`;
+                console.error("Error creating playlist:", error);
+            }
+        }
+
+        async function fetchDefaultRecs() {
+            try {
+                const res = await fetch(`${apiBase}/default_recommendations`);
+                const data = await res.json();
+                showRecommendations(data.recommendations);
+                currentRecs = data.recommendations;
+            } catch (error) {
+                appendChat('bot', '⚠️ Failed to fetch default recommendations.');
+                console.error("Error fetching defaults:", error);
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchDefaultRecs();
+            
+            // Allow sending message with Enter key
+            document.getElementById('message').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
