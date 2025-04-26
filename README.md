@@ -25,7 +25,7 @@ PersonalAIs is a modern, conversation-based music recommender system that genera
 | Spotify Web API| Python 3.10+       | SQLite (async ORM)     |
 
 
-![Screenshot of PersonalAIs Interface](assets/interface.png)
+![Screenshot of PersonalAIs Interface](alembic/personalAIs.png)
 
 
 ---
