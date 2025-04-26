@@ -155,3 +155,5 @@ You can even **create playlists directly on your Spotify account**! 🎶
 
 # 🎉 Thank You for using PersonalAIs!
 > *“Music is the shorthand of emotion.” – Leo Tolstoy*
+>
+> ![Screenshot of PersonalAIs Interface](alembic/Interface.png)
