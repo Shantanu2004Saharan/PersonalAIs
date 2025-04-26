@@ -145,12 +145,13 @@ You can also **create playlists directly on your Spotify account**.
 
 ---
 
-## Credits
+## Video link showing the working of the chatbot 
 
-- **Developer**: Shantanu (IIT Bombay)
-- **Technologies Used**: Spotify API, Huggingface Transformers, Sentence-Transformers, FAISS, FastAPI
+https://drive.google.com/drive/u/4/folders/1zikkLDk_dbxz8yucueCXbxWCBKTQcI3d
 
 ---
 
 # Thank You for Using PersonalAIs
 > *"Music is the shorthand of emotion." – Leo Tolstoy*
+>
+> ![Screenshot of PersonalAIs Interface](alembic/personalAIs.png)
