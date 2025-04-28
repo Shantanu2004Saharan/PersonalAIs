@@ -2,7 +2,7 @@
 # PersonalAIs - AI-Powered Music Recommender
 
 Welcome to **PersonalAIs** — your intelligent music companion.  
-Simply tell the app your mood, activity, or vibe, and it will recommend **personalized playlists** curated just for you.  
+Simply tell the app your mood, activity, or vibe, and it wil recommend **personalized playlists** curated just for you.  
 You can also **create playlists directly on your Spotify account**.
 
 ---
