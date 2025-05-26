@@ -135,7 +135,7 @@ You can also **create playlists directly on your Spotify account**.
 
 ## Features
 
-- Emotion and Activity-Based Song Recommendation
+- Emotion and Activity-Based Song Recommendations
 - Conversational Memory for Personalized Experience
 - Direct Spotify Playlist Creation
 - Adaptive Learning from User Feedback
